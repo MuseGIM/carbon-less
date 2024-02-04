@@ -4,10 +4,12 @@ import { Stack, Link } from 'expo-router';
 export default function Page() {
   return (
     <View style={styles.container}>
-      <Stack.Screen name="" />
+      <Stack.Screen options={{title:"Home"}} />
       <View >
         <Text>Home page</Text>
         <Link href="/ongoing">hello</Link>
+        <Link href="/welcome">Welcome</Link>
+        <Link href="/onroute">On Route</Link>
       </View>
     </View>
  );
