@@ -6,6 +6,7 @@ import { Stack, Link, SplashScreen } from 'expo-router';
 import { useFonts } from 'expo-font';
 
 
+//IF ()
 
 interface IconDataProps {
     title: string;

@@ -1,18 +1,21 @@
 import { Text, View, StyleSheet, Pressable } from 'react-native';
 import { Stack, Link } from 'expo-router';
 
+import HomeScreen from './welcome';
+
 export default function Page() {
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{title:"Home"}} />
-      <View >
-        <Text>Home page</Text>
-        <Link href="/summary" asChild><Pressable><Text>Summary Page</Text></Pressable></Link>
-        <Link href="/welcome">Welcome Page</Link>
-        <Link href="/onroute">On Route</Link>
-        <Link href="/extra">No Trips</Link>
-      </View>
-    </View>
+    <HomeScreen />
+    // <View style={styles.container}>
+    //   <Stack.Screen options={{title:"Home"}} />
+    //   <View >
+    //     <Text>Home page</Text>
+    //     <Link href="/summary" asChild><Pressable><Text>Summary Page</Text></Pressable></Link>
+    //     <Link href="/welcome">Welcome Page</Link>
+    //     <Link href="/onroute">On Route</Link>
+    //     <Link href="/extra">No Trips</Link>
+    //   </View>
+    // </View>
  );
 }
 

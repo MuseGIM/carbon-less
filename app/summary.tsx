@@ -1,7 +1,9 @@
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Stack, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+
 import { LineChart } from "react-native-gifted-charts";
 import { useState, useEffect } from 'react'
 
@@ -102,6 +104,10 @@ async function calculateEmissions(){
   };
 }
 
+function NoData (){
+  return <Text style={styles.noData}>No Data Found...</Text>;
+}
+
 export default function Page() {
 
   const [emissionData, setEmissionData] = useState<Array<any>>([{value:0},{value:30},{value:100},{value:50}]);
@@ -110,13 +116,23 @@ export default function Page() {
   const [test1, setTest1] = useState<string>("NOTH");
   const [test2, setTest2] = useState<string>("ING");
 
+  const [emissionLoaded, setEmissionLoaded] = useState<boolean>(false);
+  const [distanceLoaded, setDistanceLoaded] = useState<boolean>(false);
+  const [speedLoaded, setSpeedLoaded] = useState<boolean>(false);
+
 
   useEffect(() => {
-    Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME).then((val) => {
+      if (val){
+        Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      }
+    });
+    
+    
     calculateEmissions().then(function (dict){
       setTest1(JSON.stringify(dict));
       // setTest2(JSON.stringify(dict?.speeds));
-      dict?.speeds;
+
       console.log(dict?.speeds);
       console.log(dict?.emissions);
 
@@ -125,35 +141,53 @@ export default function Page() {
         dataVals.push({value:v});
       }
       setEmissionData(dataVals);
+      setEmissionLoaded(true);
       
       dataVals = [];
       for(const v of dict?.distances ?? []){
         dataVals.push({value:v});
       }
       setDistanceData(dataVals);
+      setDistanceLoaded(true);
 
       dataVals = []
       for(const v of dict?.speeds ?? []){
         dataVals.push({value:v});
       }
       setSpeedData(dataVals);
+      setSpeedLoaded(true);
     });
   }, []);
   
   return(
  <View style={styles.container}>
   <Stack.Screen options={{title:"Route Summary"}} />
-   <View>
-      <View>
-        <Text style={styles.title}>Summary<Text style={{ color: 'green' }}> Page</Text></Text>
+    <View>
+      <Text style={styles.title}>Summary<Text style={{ color: 'green' }}> Page</Text></Text>
+    </View>
+    
+      {(speedData.length + distanceData.length + emissionData.length) > 0 && (speedLoaded && distanceLoaded && emissionLoaded) ? <View style={{flex:1}}><View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
+        {emissionLoaded ?
+          ((emissionData.length > 0 ) ? <LineChart data = {emissionData} /> : <NoData/>) :
+          <ActivityIndicator animating={true}/>
+        }
       </View>
 
-      <Text>{test1}</Text>
-      <Text>{test2}</Text>
-      <LineChart data = {emissionData} />
-      <LineChart data = {speedData} />
-      <LineChart data = {distanceData} />
-    </View>
+      <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
+        {speedLoaded ?
+          ((speedData.length > 0 ) ? <LineChart data = {speedData} /> : <NoData/>) :
+          <ActivityIndicator animating={true}/>
+        }
+      </View>
+
+      <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
+        {distanceLoaded ?
+          ((distanceData.length > 0 ) ? <LineChart data = {distanceData} /> : <NoData/>) :
+          <ActivityIndicator animating={true}/>
+        }
+      </View>
+    </View> : <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}><NoData/></View>}
+      
   </View>
   );
 }
@@ -172,7 +206,11 @@ const styles = StyleSheet.create({
       fontWeight: 'bold',
       paddingVertical: 30
   },
-
+  noData: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    paddingBottom: '40%'
+  }
   
 
 });

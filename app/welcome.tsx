@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { StyleSheet, Text, View, ImageBase } from 'react-native'
+import { StyleSheet, Text, View, ImageBase, Pressable } from 'react-native'
 import DropDownPicker from 'react-native-dropdown-picker';
 import { Button } from 'react-native-paper'
 import { FontAwesome } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { Stack, Link, SplashScreen } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { BottomNavigation } from 'react-native-paper';
 import measure from './summary.js';
- 
+
 const HomeScreen = () => {
 
     const [open, setOpen] = useState(false);
@@ -19,58 +19,30 @@ const HomeScreen = () => {
         { label: 'Train', value: 'Train' }
     ]);
 
-    // const [itemsSecond, setItemsSecond] = useState([
-
-    //     { label: 'Car', value: 'car' },
-    //     { label: 'Bus', value: 'bus' },
-    //     { label: 'Train', value: 'train' }
-    // ]);
-
     const CustomCarIcon = () => (
         <FontAwesome name="car" size={20} color="#000000" />
     );
-    // const HomeRoute = () => <Text>HomeRoute</Text>;
 
-    // const EnRoute = () => <Text>EnRoute</Text>;
-    
-    // const SummaryPage = () => <Text>SummaryPage</Text>;
-        
-    // const MyComponent = () => {
-    //   const [index, setIndex] = React.useState(0);
-    //   const [routes] = React.useState([
-    //     { key: 'HomeRoute', title: 'HomeRoute', focusedIcon: 'home'},
-    //     { key: 'EnRoute', title: 'EnRoute', focusedIcon: 'EnRoute' },
-    //     { key: 'SummaryPage', title: 'SummaryPage', focusedIcon: 'SummaryPage' },
-    //   ]);
-    
-    //   const renderScene = BottomNavigation.SceneMap({
-    //     HomeRoute: HomeRoute,
-    //     EnRoute: EnRoute,
-    //     SummaryPage: SummaryPage,
-    //   });
-    // }
-    
+    const [fontsLoaded, fontError] = useFonts({
+        'InterRegular': require('../assets/fonts/InterRegular.ttf'),
+    });
 
-    // const [fontsLoaded, fontError] = useFonts({
-    //     'Inter-Regular': require('./assets/fonts/InterRegular.ttf'),
-    //   });
-      
-    // const onLayoutRootView = useCallback(async () => {
-    //     if (fontsLoaded || fontError) {
-    //       await SplashScreen.hideAsync();
-    //     }
-    //   }, [fontsLoaded, fontError]);
-    // if (!fontsLoaded && !fontError) {
-    // return null;
-    // }
+    const onLayoutRootView = useCallback(async () => {
+        if (fontsLoaded || fontError) {
+            await SplashScreen.hideAsync();
+        }
+    }, [fontsLoaded, fontError]);
+    if (!fontsLoaded && !fontError) {
+        return null;
+    }
     return (
         <View style={styles.container}>
-            <Stack.Screen options={{title:"Welcome"}} />
-            <View>
-                <View>
-                    <Text style={styles.title}>Carbon<Text style={{ color: 'green' }}>-Less</Text></Text>
-                </View>
-                <View style={styles.mainContentContainer}>
+            <Stack.Screen options={{ title: "Welcome" }} />
+            <View style={{ justifyContent: "space-between", flex: 1 }}>
+                <View style={{flexDirection:"column"}}>
+                    <View>
+                        <Text style={styles.title}>Carbon<Text style={{ fontFamily: "InterRegular", color: 'green' }}>-Less</Text></Text>
+                    </View>
                     <View>
                         <Text style={styles.modeSelection}>Select your mode of transport:</Text>
                     </View>
@@ -87,7 +59,7 @@ const HomeScreen = () => {
                                 borderColor: '#000000',
                                 borderWidth: 1,
                             }}
-                            labelStyle ={{fontSize:32}}
+                            labelStyle={{ fontSize: 20 }}
 
 
                         />
@@ -110,26 +82,30 @@ const HomeScreen = () => {
                             )
                         } */}
                     </View>
-                    <View style={styles.buttonContainer}>
-                        <Link href="/onroute">
-                        <Button  labelStyle={{alignSelf: "center", justifyContent: "center", fontSize: 36, lineHeight:38}}  style={{width: 300, height: 300, borderRadius: 150, display: "flex", justifyContent: "center"}} mode="contained" buttonColor='green' dark>Start Route</Button>
-                        </Link>
-                    </View>
+
+                </View>
+                <View style={styles.buttonContainer}>
+                    <Link style={{ flex: 1, justifyContent:"flex-end" }} href="/onroute" asChild>
+                    {/* <View></View> */}
+                        <Pressable><View style={{marginBottom:"22%", alignItems: "center", justifyContent:"center", backgroundColor: "green", height: 300, width: 300, borderRadius: 1000}}>
+                            <Text style={{fontSize: 40, color: "#ffffff", fontWeight:600}}>Start Route</Text>
+                            </View></Pressable>
+                    </Link>
                 </View>
             </View>
-        
+
         </View>
     );
 }
 
 
 const styles = StyleSheet.create({
-    
+
     container: {
         flex: 1,
         flexDirection: 'column',
         backgroundColor: '#FFFFFF',
-        fontFamily: "InterRegular"
+        fontFamily: "InterRegular",
     },
     title: {
         color: '#1E1E1E',
@@ -137,6 +113,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         fontSize: 48,
         fontWeight: 'bold',
+        marginTop: 40,
+        marginBottom: 20
     },
     modeSelection: {
         color: '#000000',
@@ -151,16 +129,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginBottom: 100,
     },
-    buttonContainer:{
-        flexDirection: 'column',
+    buttonContainer: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        paddingBottom: 0
     },
     mainContentContainer: {
         flexDirection: 'column',
         justifyContent: 'space-between',
-    },
-    
+    }
 });
 
 export default HomeScreen;

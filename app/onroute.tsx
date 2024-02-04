@@ -10,6 +10,7 @@ import {measure, getMPG} from './functions'
 
 
 const LOCATION_TASK_NAME = 'background-location-task';
+const SECONDS_IN_A_DAY = 86400;
 
 // const getPermissions = async () => {
 //   const { status: foregroundStatus } = await Location.getForegroundPermissionsAsync();
@@ -65,7 +66,7 @@ const requestPermissions = async () => {
         accuracy: Location.Accuracy.BestForNavigation,
         // activityType: 2,
         distanceInterval: 0,
-        timeInterval: 1000,
+        timeInterval: 500,
       });
     }
   }
@@ -116,7 +117,7 @@ export default function Page() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.page}>
       <Stack.Screen name="" options={{ title: "On Route" }} />
       <OnRouteContent />
       {/* <View >
@@ -126,10 +127,10 @@ export default function Page() {
 
 
       </View> */}
+      <EndRouteButton/>
     </View>
   );
 }
-
 
 interface IconDataProps {
   title: string;
@@ -141,16 +142,15 @@ interface MissionDataProps {
   value: number;
 }
 
-
 function IconData(props: IconDataProps) {
   return (<View style={styles.tripInformationCol}>
     <View>
       {/* <Text>IMG</Text> */}
-      <Image style={{ width: 50, resizeMode: "contain" }} source={props.image} />
+      <Image style={{ width: 32, height:64, resizeMode: "contain" }} source={props.image} />
     </View>
-    <View>
-      <Text style={{fontWeight: "bold", fontSize: 14}}>{props.title}</Text>
-      <Text style={{fontSize: 14}}>{props.data}</Text>
+    <View style={{paddingLeft: 8}}>
+      <Text style={{color:"#ffffff", fontWeight: "bold", fontSize: 14}}>{props.title}</Text>
+      <Text style={{color:"#ffffff", fontSize: 14}}>{props.data}</Text>
     </View>
   </View>);
 };
@@ -159,21 +159,33 @@ function EmissionsData(props: MissionDataProps) {
   return (
     <View style={{alignItems:"center"}}>
       <View>
-        <Text style={{ fontSize: 24, marginBottom: 15}}>Real-Time Carbon Emissions:</Text>
+        <Text style={{ fontSize: 24, fontWeight:'bold',marginBottom: 15, color:'white'}}>Real-Time Carbon Emissions:</Text>
       </View>
       <View style={{flexDirection: 'row', alignItems: 'flex-end'}}>
-        <Text style={{ fontSize: 32 }}>{props.value} g CO</Text>
-        <Text style={{fontSize: 16, lineHeight: 18}}>2</Text>
-        <Text style={{ fontSize: 32 }}>e</Text>
+        <Text style={{ fontSize: 32, fontWeight:'bold', color:'white'}}>{props.value} g CO</Text>
+        <Text style={{fontSize: 16, fontWeight:'bold' ,lineHeight: 18, color:'white'}}>2</Text>
+        <Text style={{ fontSize: 32, fontWeight:'bold', color:'white'}}>e</Text>
       </View>
     </View>
   );
+}
+
+function secsToTime(seconds: number){
+  var hours = Math.floor(seconds/3600);
+  var minutes = Math.floor(seconds/60) - (hours*60);
+  var secs = seconds % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
 
 function QuickStats() {
 
   var [avgSpeed, setAvgSpeed] = useState<number>(0.0);
+  var [distance, setDistance] = useState<number>(0.0);
+  var [duration, setDuration] = useState<number>(0.0);
+
+  var [startTime, setStartTime] = useState<number>(0.0);
+  var [endTime, setEndTime] = useState<number>(0.0);
 
   useEffect(() => {
 
@@ -185,36 +197,35 @@ function QuickStats() {
       }
       var locations: Array<Location.LocationObject> = Object.values(JSON.parse(locationsAtStorage));
       locations.sort((a, b) => b.timestamp - a.timestamp); // descending order  
-      if (locations.length < 6) {
+      if (locations.length < 16) {
         return;
       }
 
+      var timestamps = locations.slice(0, 16).map(v => v.timestamp);
+      var latitudes = locations.slice(0, 16).map(v => v.coords.latitude);
+      var longitudes = locations.slice(0, 16).map(v => v.coords.longitude);
+      var altitudes = locations.slice(0, 16).map(v => v.coords.altitude);
 
-      var timestamps = locations.slice(0, 6).map(v => v.timestamp);
-      var latitudes = locations.slice(0, 6).map(v => v.coords.latitude);
-      var longitudes = locations.slice(0, 6).map(v => v.coords.longitude);
-      var altitudes = locations.slice(0, 6).map(v => v.coords.altitude);
-
-      var first_3_time = timestamps.slice(3, 6).reduce((a, b) => a + b) / 3.0;
-      var first_3_latitude = latitudes.slice(3, 6).reduce((a, b) => a + b) / 3.0;
-      var first_3_longitude = longitudes.slice(3, 6).reduce((a, b) => a + b) / 3.0;
+      var first_3_time = timestamps.slice(8, 16).reduce((a, b) => a + b) / 8.0;
+      var first_3_latitude = latitudes.slice(8, 16).reduce((a, b) => a + b) / 8.0;
+      var first_3_longitude = longitudes.slice(8, 16).reduce((a, b) => a + b) / 8.0;
       var first_3_altitude = null;
-      var sum = altitudes.slice(3, 6).reduce(function (a, b) {
+      var sum = altitudes.slice(8, 16).reduce(function (a, b) {
         return (a == null ? 0 : a) + (b == null ? 0 : b);
       });
       if (sum != null) {
-        first_3_altitude = sum / 3.0;
+        first_3_altitude = sum / 8.0;
       }
 
-      var next_3_time = timestamps.slice(0, 3).reduce((a, b) => a + b) / 3.0;
-      var next_3_latitude = latitudes.slice(0, 3).reduce((a, b) => a + b) / 3.0;
-      var next_3_longitude = longitudes.slice(0, 3).reduce((a, b) => a + b) / 3.0;
+      var next_3_time = timestamps.slice(0, 8).reduce((a, b) => a + b) / 8.0;
+      var next_3_latitude = latitudes.slice(0, 8).reduce((a, b) => a + b) / 8.0;
+      var next_3_longitude = longitudes.slice(0, 8).reduce((a, b) => a + b) / 8.0;
       var next_3_altitude = null;
-      var sum = altitudes.slice(0, 3).reduce(function (a, b) {
+      var sum = altitudes.slice(0, 8).reduce(function (a, b) {
         return (a == null ? 0 : a) + (b == null ? 0 : b);
       });
       if (sum != null) {
-        next_3_altitude = sum / 3.0;
+        next_3_altitude = sum / 8.0;
       }
 
       var time_delta = (next_3_time - first_3_time) / (1000);
@@ -224,9 +235,33 @@ function QuickStats() {
 
       var dm = measure(first_3_latitude, first_3_longitude, next_3_latitude, next_3_longitude);
 
+      console.log("NONE DISTANCE(dm) ALTITUDE : %f %f", dm, altitude_delta);
+
       var final_distance = Math.sqrt((dm ** 2) + (altitude_delta ** 2));
 
-      var speed = final_distance / time_delta;
+      var speed = final_distance / time_delta; // m/s -> mph
+      speed *= 2.23694;
+
+      setAvgSpeed(speed);
+
+      var first_timestamp = locations[locations.length-1].timestamp;
+      setStartTime(first_timestamp/1000);
+      var last_timestamp = locations[0].timestamp;
+      setEndTime(last_timestamp/1000);
+      setDuration((last_timestamp - first_timestamp)/1000);
+
+      // get distance
+      var coords = locations.map(v => [v.coords.latitude, v.coords.longitude, v.coords.altitude]);
+      
+      var distance = 0;
+      for (var i = 0; i < coords.length-1; i++){
+        var dm = measure(coords[i+1][0]!, coords[i+1][1]!, coords[i][0]!, coords[i][1]!);
+        var altitude_delta = coords[i][2]! - coords[i+1][2]!;
+        dm = Math.sqrt((dm**2) + (altitude_delta**2));
+        distance += dm;
+      }
+      distance *= 0.000621371;
+      setDistance(distance);
     }
     const interval = setInterval(() => {
       updateStats();
@@ -238,19 +273,28 @@ function QuickStats() {
   return (<View style={styles.tripInformationBox}>
     <View style={styles.tripInformationSubBox}>
       <View style={styles.tripInformationRow}>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/speed.png')} data={avgSpeed + " km/h"} title="Average Speed" /></View>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/favicon.png')} data="10 km/h" title="Distance" /></View>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/duration.png')} data="10 km/h" title="Duration" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/avgSpeed.png')} data={avgSpeed + " mph"} title="Average Speed" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/distance.png')} data={distance + " mi"} title="Distance" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/duration.png')} data={secsToTime(duration)} title="Duration" /></View>
       </View>
       <View style={styles.tripInformationRow}>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/time.png')} data="10 km/h" title="Start Time" /></View>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/time-bigger.png')} data="10 km/h" title="End Time" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/startTime.png')} data={secsToTime(startTime % SECONDS_IN_A_DAY)} title="Start Time" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/endTime.png')} data={secsToTime(endTime % SECONDS_IN_A_DAY)} title="End Time" /></View>
       </View>
     </View>
     <EmissionsData value={10}/>
   </View>)
 }
 
+function EndRouteButton(){
+
+  return (<View style={{}}>
+    <Link style={{paddingBottom:"20%"}} href="/summary">
+      <Button  labelStyle={{alignSelf: "center", justifyContent: "center", fontSize: 36, lineHeight:0}}  style={{width: 300, height: 100, borderRadius: 32, display: "flex", justifyContent: "center"}} mode="contained" buttonColor='green' dark>End Route</Button>
+    </Link>
+  </View>
+);
+}
 
 export function OnRouteContent() {
   return (
@@ -270,6 +314,12 @@ export function OnRouteContent() {
 
 
 const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
   container: {
     flex: 1,
     alignItems: 'center',
@@ -299,28 +349,32 @@ const styles = StyleSheet.create({
   },
   tripInformationHeader: {
     fontSize: 22,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+    paddingBottom: 10
   },
   tripInformationBox: {
     display: "flex",
+    alignItems: 'center',
     backgroundColor: 'green',
-    borderRadius: 8,
+    color: 'white',
+    borderRadius: 20,
     padding: 20
   },
   tripInformationSubBox: {
     display: "flex",
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingTop: 10,
-    paddingBottom: 10
+    paddingBottom: 20
   },
   tripInformationRow: {
     display: "flex",
     flexDirection: "column",
   },
   tripInformationCol: {
-    color: 'white',
+    paddingRight: 8,
+    fontSize: 20,
     display: "flex",
     flexDirection: "row",
+    alignItems: "center"
   }
 });
