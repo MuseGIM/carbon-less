@@ -6,8 +6,7 @@ import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import styles from 'welcom.e.tsx';
-import {measure, getMPG} from './functions'
-
+import {measure, getMPG, calcResults, CoordData, getAvgCoord} from './functions'
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const SECONDS_IN_A_DAY = 86400;
@@ -27,7 +26,6 @@ const SECONDS_IN_A_DAY = 86400;
 TaskManager.defineTask(LOCATION_TASK_NAME, ({ data: { locations }, error }: { data: { locations: Array<Location.LocationObject> }, error: any }) => {
   console.log("Inside task");
   if (error) {
-    AsyncStorage.setItem('location', error.message);
     console.log(error);
     // Error occurred - check `error.message` for more details.
     return;
@@ -146,7 +144,7 @@ function IconData(props: IconDataProps) {
   return (<View style={styles.tripInformationCol}>
     <View>
       {/* <Text>IMG</Text> */}
-      <Image style={{ width: 32, height:64, resizeMode: "contain" }} source={props.image} />
+      <Image style={{ width: 32, height:64, resizeMode: "contain", tintColor: 'white'}} source={props.image} />
     </View>
     <View style={{paddingLeft: 8}}>
       <Text style={{color:"#ffffff", fontWeight: "bold", fontSize: 14}}>{props.title}</Text>
@@ -155,26 +153,21 @@ function IconData(props: IconDataProps) {
   </View>);
 };
 
-function EmissionsData(props: MissionDataProps) {
-  return (
-    <View style={{alignItems:"center"}}>
-      <View>
-        <Text style={{ fontSize: 24, fontWeight:'bold',marginBottom: 15, color:'white'}}>Real-Time Carbon Emissions:</Text>
-      </View>
-      <View style={{flexDirection: 'row', alignItems: 'flex-end'}}>
-        <Text style={{ fontSize: 32, fontWeight:'bold', color:'white'}}>{props.value} g CO</Text>
-        <Text style={{fontSize: 16, fontWeight:'bold' ,lineHeight: 18, color:'white'}}>2</Text>
-        <Text style={{ fontSize: 32, fontWeight:'bold', color:'white'}}>e</Text>
-      </View>
-    </View>
-  );
-}
 
-function secsToTime(seconds: number){
+function secsToTime(seconds: number, meridiem: boolean = false){
   var hours = Math.floor(seconds/3600);
   var minutes = Math.floor(seconds/60) - (hours*60);
   var secs = seconds % 60;
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  if (meridiem){
+    if (hours == 12){
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} PM`;
+    } else if (hours > 12){
+      return `${(hours-12).toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} PM`;
+    } else {
+      return `${(hours > 0 ? hours : 12).toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} AM`;
+    }
+  }
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${Math.floor(secs).toString().padStart(2, "0")}`;
 }
 
 
@@ -187,6 +180,9 @@ function QuickStats() {
   var [startTime, setStartTime] = useState<number>(0.0);
   var [endTime, setEndTime] = useState<number>(0.0);
 
+  var [carbonEmissions, setCarbonEmissions] = useState<number>(0.0);
+  var emissions = 0;
+
   useEffect(() => {
 
     async function updateStats() {
@@ -197,58 +193,38 @@ function QuickStats() {
       }
       var locations: Array<Location.LocationObject> = Object.values(JSON.parse(locationsAtStorage));
       locations.sort((a, b) => b.timestamp - a.timestamp); // descending order  
+
+      var first_timestamp = locations[locations.length-1].timestamp - (1000*3600*5);
+      setStartTime(first_timestamp/1000);
+      var last_timestamp = locations[0].timestamp - (1000*3600*5);
+      setEndTime(last_timestamp/1000);
+      setDuration((last_timestamp - first_timestamp)/1000);
+
+      var halfPoint = 8;
+      var endPoint = 16;
       if (locations.length < 16) {
+        endPoint = locations.length - (locations.length % 2);
+        halfPoint = Math.floor(endPoint/2);
+      }
+
+      if (halfPoint <= 0){
         return;
       }
 
-      var timestamps = locations.slice(0, 16).map(v => v.timestamp);
-      var latitudes = locations.slice(0, 16).map(v => v.coords.latitude);
-      var longitudes = locations.slice(0, 16).map(v => v.coords.longitude);
-      var altitudes = locations.slice(0, 16).map(v => v.coords.altitude);
+      var first_half: CoordData = getAvgCoord(locations, 0, halfPoint);
+      var next_half: CoordData = getAvgCoord(locations, halfPoint, endPoint);
 
-      var first_3_time = timestamps.slice(8, 16).reduce((a, b) => a + b) / 8.0;
-      var first_3_latitude = latitudes.slice(8, 16).reduce((a, b) => a + b) / 8.0;
-      var first_3_longitude = longitudes.slice(8, 16).reduce((a, b) => a + b) / 8.0;
-      var first_3_altitude = null;
-      var sum = altitudes.slice(8, 16).reduce(function (a, b) {
-        return (a == null ? 0 : a) + (b == null ? 0 : b);
-      });
-      if (sum != null) {
-        first_3_altitude = sum / 8.0;
-      }
+      var result = calcResults(first_half, next_half);
 
-      var next_3_time = timestamps.slice(0, 8).reduce((a, b) => a + b) / 8.0;
-      var next_3_latitude = latitudes.slice(0, 8).reduce((a, b) => a + b) / 8.0;
-      var next_3_longitude = longitudes.slice(0, 8).reduce((a, b) => a + b) / 8.0;
-      var next_3_altitude = null;
-      var sum = altitudes.slice(0, 8).reduce(function (a, b) {
-        return (a == null ? 0 : a) + (b == null ? 0 : b);
-      });
-      if (sum != null) {
-        next_3_altitude = sum / 8.0;
-      }
+      // miles_traveled.push(result.distance_traveled);
+      // total_emissions += result.emissions;
+      // carbon_emissions.push(total_emissions);
 
-      var time_delta = (next_3_time - first_3_time) / (1000);
-      var altitude_delta = 0;
-      if (next_3_altitude != null && first_3_altitude != null)
-        altitude_delta = next_3_altitude - first_3_altitude;
-
-      var dm = measure(first_3_latitude, first_3_longitude, next_3_latitude, next_3_longitude);
-
-      console.log("NONE DISTANCE(dm) ALTITUDE : %f %f", dm, altitude_delta);
-
-      var final_distance = Math.sqrt((dm ** 2) + (altitude_delta ** 2));
-
-      var speed = final_distance / time_delta; // m/s -> mph
-      speed *= 2.23694;
-
-      setAvgSpeed(speed);
-
-      var first_timestamp = locations[locations.length-1].timestamp;
-      setStartTime(first_timestamp/1000);
-      var last_timestamp = locations[0].timestamp;
-      setEndTime(last_timestamp/1000);
-      setDuration((last_timestamp - first_timestamp)/1000);
+      setAvgSpeed(result.speed);
+      
+      if(result.emissions > 2)
+        emissions += result.emissions;
+      setCarbonEmissions(emissions);
 
       // get distance
       var coords = locations.map(v => [v.coords.latitude, v.coords.longitude, v.coords.altitude]);
@@ -267,30 +243,42 @@ function QuickStats() {
       updateStats();
     }, 1000);
 
+    updateStats();
+
     return () => clearInterval(interval);
   }, []);
 
   return (<View style={styles.tripInformationBox}>
     <View style={styles.tripInformationSubBox}>
       <View style={styles.tripInformationRow}>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/avgSpeed.png')} data={avgSpeed + " mph"} title="Average Speed" /></View>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/distance.png')} data={distance + " mi"} title="Distance" /></View>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/duration.png')} data={secsToTime(duration)} title="Duration" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/avgSpeed.png')} data={Math.floor(avgSpeed > 5 ? avgSpeed : 0).toFixed(1) + " mph"} title="Average Speed" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/distance.png')} data={distance.toFixed(1) + " mi"} title="Distance" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/duration.png')} data={duration > 0 ? secsToTime(duration) : "--:--:--"} title="Duration" /></View>
       </View>
       <View style={styles.tripInformationRow}>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/startTime.png')} data={secsToTime(startTime % SECONDS_IN_A_DAY)} title="Start Time" /></View>
-        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/endTime.png')} data={secsToTime(endTime % SECONDS_IN_A_DAY)} title="End Time" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/startTime.png')} data={startTime > 0 ? secsToTime(startTime % SECONDS_IN_A_DAY, true) : "--:--"} title="Start Time" /></View>
+        <View style={styles.tripInformationCol}><IconData image={require('../assets/images/endTime.png')} data={endTime > 0 ? secsToTime(endTime % SECONDS_IN_A_DAY, true) : "--:--"} title="End Time" /></View>
       </View>
     </View>
-    <EmissionsData value={10}/>
+    <View style={{alignItems:"center"}}>
+      <View>
+        <Text style={{ fontSize: 24, fontWeight:'bold',marginBottom: 15, color:'white'}}>Real-Time Carbon Emissions:</Text>
+      </View>
+      <View style={{flexDirection: 'row', alignItems: 'flex-end'}}>
+        <Text style={{ fontSize: 32, fontWeight:'bold', color:'white'}}>{Math.floor(carbonEmissions/3)} g CO</Text>
+        <Text style={{fontSize: 16, fontWeight:'bold' ,lineHeight: 18, color:'white'}}>2</Text>
+        <Text style={{ fontSize: 32, fontWeight:'bold', color:'white'}}>e</Text>
+      </View>
+    </View>
   </View>)
 }
 
 function EndRouteButton(){
 
   return (<View style={{}}>
-    <Link style={{paddingBottom:"20%"}} href="/summary">
-      <Button  labelStyle={{alignSelf: "center", justifyContent: "center", fontSize: 36, lineHeight:0}}  style={{width: 300, height: 100, borderRadius: 32, display: "flex", justifyContent: "center"}} mode="contained" buttonColor='green' dark>End Route</Button>
+    <Link style={{marginBottom:"20%"}} href="/summary">
+      <Button labelStyle={{alignSelf: "center", justifyContent: "center", fontSize: 30, fontWeight:'bold',lineHeight:30, color:"#ffffff"}}  style={{width: 300, height: 100, borderRadius: 32, display: "flex", justifyContent: "center"}} mode="contained" buttonColor='green'>End Route</Button>
+      
     </Link>
   </View>
 );
@@ -323,6 +311,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
+    
     justifyContent: 'center',
     padding: 20,
   },
@@ -350,7 +339,10 @@ const styles = StyleSheet.create({
   tripInformationHeader: {
     fontSize: 22,
     fontWeight: 'bold',
+    textAlign: 'center',
+    justifyContent: 'center',
     paddingBottom: 10
+
   },
   tripInformationBox: {
     display: "flex",

@@ -6,28 +6,9 @@ import * as TaskManager from 'expo-task-manager';
 
 import { LineChart } from "react-native-gifted-charts";
 import { useState, useEffect } from 'react'
+import { measure, getMPG, calcResults, CoordData, getAvgCoord } from './functions';
 
-const GRAMS_CO2_PER_GALLON = 8887;
 const LOCATION_TASK_NAME = 'background-location-task';
-
-
-function measure(lat1: number, lon1: number, lat2: number, lon2: number){  // generally used geo measurement function
-  var R = 6378.137; // Radius of earth in KM
-  var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
-  var dLon = lon2 * Math.PI / 180 - lon1 * Math.PI / 180;
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-  Math.sin(dLon/2) * Math.sin(dLon/2);
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  var d = R * c;
-  return d * 1000; // meters
-}
-
-function getMPG(speed: number){
-  // -1.004359267664*10^{-9}x^{6}+3.5676720830782*10^{-7}x^{5}-0.0000483156x^{4}+0.00321712x^{3}-0.11989x^{2}+2.68692x
-  const x = speed;
-  return -1.004359267664*(10^(-9))*(x^6) + 3.5676720830782*(10^(-7))*x^5 - (0.0000483156*x^4) + (0.00321712*x^3) - (0.11989*x^2) + (2.68692*x)
-}
 
 async function calculateEmissions(){
   const locationsAtStorage = await AsyncStorage.getItem("locations");
@@ -41,59 +22,28 @@ async function calculateEmissions(){
   var carbon_emissions = [];
   var miles_traveled = [];
   var total_emissions = 0.0;
-  for(var i = 6; i < locations.length; i += 3){
+
+  var halfLength = 3;
+  for(var i = locations.length > 6 ? 6 : Math.floor(locations.length/2); i < locations.length; i += halfLength){
+    halfLength = 3;
+    var endLength = halfLength * 2;
     if(i - 6 < 0){
-      break;
+      halfLength = Math.floor(i / 2);
+      endLength = halfLength * 2;
     }
     
-    var timestamps = locations.slice(i-6, i).map( v => v.timestamp);
-    var latitudes = locations.slice(i-6, i).map( v => v.coords.latitude);
-    var longitudes = locations.slice(i-6, i).map( v => v.coords.longitude);
-    var altitudes = locations.slice(i-6, i).map( v => v.coords.altitude);
+    var first_half: CoordData = getAvgCoord(locations, 0, halfLength);
+    var next_half: CoordData = getAvgCoord(locations, halfLength, endLength);
 
-    var first_3_time = timestamps.slice(0, 3).reduce( (a,b) => a + b) / 3.0;
-    var first_3_latitude = latitudes.slice(0, 3).reduce( (a,b) => a + b) / 3.0;
-    var first_3_longitude = longitudes.slice(0, 3).reduce( (a,b) => a + b) / 3.0;
-    var first_3_altitude = null;
-    var sum = altitudes.slice(0, 3).reduce( function (a,b) { 
-      return (a==null ? 0 : a) + (b == null ? 0 : b);
-    });
-    if (sum != null){
-      first_3_altitude =  sum / 3.0;
-    }
+    var result = calcResults(first_half, next_half);
 
-    var next_3_time = timestamps.slice(3, 6).reduce( (a,b) => a + b) / 3.0;
-    var next_3_latitude = latitudes.slice(3, 6).reduce( (a,b) => a + b) / 3.0;
-    var next_3_longitude = longitudes.slice(3, 6).reduce( (a,b) => a + b) / 3.0;
-    var next_3_altitude = null;
-    var sum = altitudes.slice(3, 6).reduce( function (a,b) { 
-      return (a==null ? 0 : a) + (b == null ? 0 : b);
-    });
-    if (sum != null){
-      next_3_altitude =  sum / 3.0;
-    }
-    
-    var time_delta = (next_3_time - first_3_time)/(1000);
-    var altitude_delta = 0;
-    if(next_3_altitude != null && first_3_altitude != null)
-    altitude_delta = next_3_altitude - first_3_altitude;
-      
-    var dm = measure(first_3_latitude, first_3_longitude, next_3_latitude, next_3_longitude);
-    
-    var final_distance = Math.sqrt((dm**2) + (altitude_delta**2));
-
-    var speed = final_distance / time_delta; 
-    // meters per second -> miles per gallon
-    speed *= 2.23694;
-    average_speeds.push(speed);
-    var GPM = 1/getMPG(speed);
-    if (speed < 5 || speed > 130){
+    average_speeds.push(result.speed);
+    var GPM = 1/getMPG(result.speed);
+    if (result.speed < 5 || result.speed > 130){
       GPM = 0.05;
     }
-    var dist_in_miles = final_distance * 0.000621371; // converts meters to miles
-    miles_traveled.push(dist_in_miles);
-    var gallons_wasted = GPM * dist_in_miles;
-    total_emissions += gallons_wasted*GRAMS_CO2_PER_GALLON;
+    miles_traveled.push(result.distance_traveled);
+    total_emissions += result.emissions;
     carbon_emissions.push(total_emissions);
   }
 
@@ -108,6 +58,18 @@ function NoData (){
   return <Text style={styles.noData}>No Data Found...</Text>;
 }
 
+interface StatsChartProps{
+  data: Array<any>,
+  xAxisTitle: string
+}
+
+function StatsChart(props: StatsChartProps){
+  return (<View style={{flexDirection: "column", flex: 1}}>
+    <LineChart data = {props.data} />
+    <Text>{props.xAxisTitle}</Text>
+  </View>);
+}
+
 export default function Page() {
 
   const [emissionData, setEmissionData] = useState<Array<any>>([{value:0},{value:30},{value:100},{value:50}]);
@@ -120,13 +82,16 @@ export default function Page() {
   const [distanceLoaded, setDistanceLoaded] = useState<boolean>(false);
   const [speedLoaded, setSpeedLoaded] = useState<boolean>(false);
 
+  const [globalXChart, setGlobalXChart] = useState<number>(0.0);
+
 
   useEffect(() => {
-    TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME).then((val) => {
-      if (val){
-        Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-      }
-    });
+    // TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME).then((val) => {
+    //   if (val){
+    //     Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    //   }
+    // });
+    TaskManager.unregisterAllTasksAsync();
     
     
     calculateEmissions().then(function (dict){
@@ -158,35 +123,62 @@ export default function Page() {
       setSpeedLoaded(true);
     });
   }, []);
+
+  const emissionChart = (<LineChart scrollRef={globalXChart} onScroll={function(index){
+    setGlobalXChart(index['nativeEvent']['contentOffset']['x']);
+  }} data = {emissionData} />);
   
   return(
  <View style={styles.container}>
   <Stack.Screen options={{title:"Route Summary"}} />
     <View>
-      <Text style={styles.title}>Summary<Text style={{ color: 'green' }}> Page</Text></Text>
+      <Text style={styles.title}>Summary<Text> Page</Text></Text>
     </View>
-    
-      {(speedData.length + distanceData.length + emissionData.length) > 0 && (speedLoaded && distanceLoaded && emissionLoaded) ? <View style={{flex:1}}><View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
+      
+
+      {(speedData.length + distanceData.length + emissionData.length) > 0 && (speedLoaded || distanceLoaded || emissionLoaded) ? <ScrollView style={{flex:1}}>
+      <View>
+        <Text style={{textAlign: "center", fontSize: 24}}>Total Emissions: {Math.floor(emissionData[emissionData.length-1].value).toFixed(0)} g CO</Text>
+        <Text style={{fontSize: 16, fontWeight:'bold', lineHeight: 18}}>2</Text>
+      </View>
+      <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
         {emissionLoaded ?
-          ((emissionData.length > 0 ) ? <LineChart data = {emissionData} /> : <NoData/>) :
+          ((emissionData.length > 0 ) ? <LineChart onScroll={function(index){
+            setGlobalXChart(index['nativeEvent']['contentOffset']['x']);
+          }} data = {emissionData} /> : <NoData/>) :
           <ActivityIndicator animating={true}/>
         }
       </View>
+      <Text style={{textAlign: "center", fontSize: 20}}>Emissions</Text>
 
+      <View>
+        <Text style={{textAlign: "center", fontSize: 24}}>Average Speed: {Math.floor(speedData.map(a => a.value).reduce((partialSum, a) => partialSum + a, 0) / speedData.length).toFixed(0)} mph</Text>
+        <Text style={{fontSize: 16, fontWeight:'bold', lineHeight: 18}}>2</Text>
+      </View>
       <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
         {speedLoaded ?
-          ((speedData.length > 0 ) ? <LineChart data = {speedData} /> : <NoData/>) :
+          ((speedData.length > 0 ) ? <LineChart onScroll={function(index){
+            setGlobalXChart(index['nativeEvent']['contentOffset']['x']);
+          }} data = {speedData} /> : <NoData/>) :
           <ActivityIndicator animating={true}/>
         }
       </View>
+      <Text style={{textAlign: "center", fontSize: 20}}>Average Speed</Text>
 
-      <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}>
+      <View>
+        <Text style={{textAlign: "center", fontSize: 24}}>Total Distance Traveled: {Math.floor(distanceData.map(a => a.value).reduce((partialSum, a) => partialSum + a, 0)).toFixed(0)} mi</Text>
+        <Text style={{fontSize: 16, fontWeight:'bold', lineHeight: 18}}>2</Text>
+      </View>
+      <View style={{flex: 1, width:300, alignItems:"center", justifyContent: "center"}}>
         {distanceLoaded ?
-          ((distanceData.length > 0 ) ? <LineChart data = {distanceData} /> : <NoData/>) :
+          ((distanceData.length > 0 ) ? <LineChart onScroll={function(index){
+            setGlobalXChart(index['nativeEvent']['contentOffset']['x']);
+          }} data = {distanceData} /> : <NoData/>) :
           <ActivityIndicator animating={true}/>
         }
       </View>
-    </View> : <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}><NoData/></View>}
+      <Text style={{textAlign: "center", fontSize: 20}}>Distance Traveled</Text>
+    </ScrollView> : <View style={{flex: 1, alignItems:"center", justifyContent: "center"}}><NoData/></View>}
       
   </View>
   );

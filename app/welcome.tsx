@@ -14,9 +14,9 @@ const HomeScreen = () => {
     const [value, setValue] = useState(null);
     const [items, setItems] = useState([
 
-        { label: 'Car', value: 'Car' },
-        { label: 'Bus', value: 'Bus' },
-        { label: 'Train', value: 'Train' }
+        { label: 'Car', value: 'Car', selectable: 'selectable' },
+        { label: 'Bus', value: 'Bus', disabled: true},
+        { label: 'Train', value: 'Train', disabled: true}
     ]);
 
     const CustomCarIcon = () => (
@@ -41,7 +41,7 @@ const HomeScreen = () => {
             <View style={{ justifyContent: "space-between", flex: 1 }}>
                 <View style={{flexDirection:"column"}}>
                     <View>
-                        <Text style={styles.title}>Carbon<Text style={{ fontFamily: "InterRegular", color: 'green' }}>-Less</Text></Text>
+                        <Text style={styles.title}>Carbon<Text style={{ fontFamily: "InterRegular", color: 'green', fontWeight:'bold'}}>-Less</Text></Text>
                     </View>
                     <View>
                         <Text style={styles.modeSelection}>Select your mode of transport:</Text>
@@ -54,14 +54,14 @@ const HomeScreen = () => {
                             setOpen={setOpen}
                             setValue={setValue}
                             setItems={setItems}
-                            containerStyle={{ width: "80%", alignItems: 'center', justifyContent: 'center' }}
+                            containerStyle={{ width: "80%", alignItems: 'center', justifyContent: 'center' }} 
                             dropDownContainerStyle={{
                                 borderColor: '#000000',
                                 borderWidth: 1,
                             }}
-                            labelStyle={{ fontSize: 20 }}
-
-
+                            labelStyle={{ fontSize: 20}}
+                            placeholder='Select an item...' 
+                            placeholderStyle={{fontSize:16}}
                         />
                         {/* {value == "car" &&
                             (
@@ -88,7 +88,7 @@ const HomeScreen = () => {
                     <Link style={{ flex: 1, justifyContent:"flex-end" }} href="/onroute" asChild>
                     {/* <View></View> */}
                         <Pressable><View style={{marginBottom:"22%", alignItems: "center", justifyContent:"center", backgroundColor: "green", height: 300, width: 300, borderRadius: 1000}}>
-                            <Text style={{fontSize: 40, color: "#ffffff", fontWeight:600}}>Start Route</Text>
+                            <Text style={{fontSize: 40, color: "#ffffff", fontWeight:'bold'}}>Start Route</Text>
                             </View></Pressable>
                     </Link>
                 </View>
@@ -126,8 +126,11 @@ const styles = StyleSheet.create({
     DropDownPickerContainer: {
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyConten2t: 'center',
         marginBottom: 100,
+   //     display: "flex",
+    //    flexDirection: "row",
+   //     alignItems: "center"
     },
     buttonContainer: {
         flex: 1,
