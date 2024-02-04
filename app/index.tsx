@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, Pressable } from 'react-native';
 import { Stack, Link } from 'expo-router';
 
 export default function Page() {
@@ -7,9 +7,10 @@ export default function Page() {
       <Stack.Screen options={{title:"Home"}} />
       <View >
         <Text>Home page</Text>
-        <Link href="/ongoing">hello</Link>
-        <Link href="/welcome">Welcome</Link>
+        <Link href="/summary" asChild><Pressable><Text>Summary Page</Text></Pressable></Link>
+        <Link href="/welcome">Welcome Page</Link>
         <Link href="/onroute">On Route</Link>
+        <Link href="/extra">No Trips</Link>
       </View>
     </View>
  );
